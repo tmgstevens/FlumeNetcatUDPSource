@@ -1,0 +1,17 @@
+.classpath
+.project
+.settings
+bin/*
+conf/flume-site.xml
+bin/.settings
+.eclipse
+pmd_report.html
+*/bin
+target
+patchprocess
+derby.log
+.idea
+*.iml
+nb-configuration.xml
+.DS_Store
+
