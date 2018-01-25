@@ -16,8 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
-package com.cloudera.flume.source;
+package org.apache.flume.source;
 
 import java.io.ByteArrayOutputStream;
 import java.net.InetSocketAddress;
@@ -36,10 +35,16 @@ import org.apache.flume.EventDrivenSource;
 import org.apache.flume.conf.Configurable;
 import org.apache.flume.conf.Configurables;
 import org.apache.flume.event.EventBuilder;
-import org.apache.flume.source.AbstractSource;
 import org.jboss.netty.bootstrap.ConnectionlessBootstrap;
 import org.jboss.netty.buffer.ChannelBuffer;
-import org.jboss.netty.channel.*;
+import org.jboss.netty.channel.AdaptiveReceiveBufferSizePredictorFactory;
+import org.jboss.netty.channel.Channel;
+import org.jboss.netty.channel.ChannelHandlerContext;
+import org.jboss.netty.channel.ChannelPipeline;
+import org.jboss.netty.channel.ChannelPipelineFactory;
+import org.jboss.netty.channel.Channels;
+import org.jboss.netty.channel.MessageEvent;
+import org.jboss.netty.channel.SimpleChannelHandler;
 import org.jboss.netty.channel.socket.oio.OioDatagramChannelFactory;
 
 import org.slf4j.Logger;
@@ -53,29 +58,29 @@ public class NetcatUdpSource extends AbstractSource
   private String host = null;
   private Channel nettyChannel;
   private String remoteHostHeader = "REMOTE_ADDRESS";
-  
+
   private static final Logger logger = LoggerFactory
       .getLogger(NetcatUdpSource.class);
 
   private CounterGroup counterGroup = new CounterGroup();
 
   // Default Min size
-  public static final int DEFAULT_MIN_SIZE = 2048;
-  public static final int DEFAULT_INITIAL_SIZE = DEFAULT_MIN_SIZE;
-  public static final String REMOTE_ADDRESS_HEADER = "remoteAddress";
-  public static final String CONFIG_PORT = "port";
-  public static final String CONFIG_HOST = "host";
+  private static final int DEFAULT_MIN_SIZE = 2048;
+  private static final int DEFAULT_INITIAL_SIZE = DEFAULT_MIN_SIZE;
+  private static final String REMOTE_ADDRESS_HEADER = "remoteAddress";
+  private static final String CONFIG_PORT = "port";
+  private static final String CONFIG_HOST = "bind";
 
-  public class NetcatHander extends SimpleChannelHandler {
+  public class NetcatHandler extends SimpleChannelHandler {
 
-    
+
     // extract line for building Flume event
-    private Event extractEvent(ChannelBuffer in, SocketAddress remoteAddress){
+    private Event extractEvent(ChannelBuffer in, SocketAddress remoteAddress) {
 
       Map<String, String> headers = new HashMap<String,String>();
-      
+
       headers.put(remoteHostHeader, remoteAddress.toString());
-      
+
       byte b = 0;
       ByteArrayOutputStream baos = new ByteArrayOutputStream();
       Event e = null;
@@ -92,14 +97,14 @@ public class NetcatUdpSource extends AbstractSource
           }
         }
 
-        e = EventBuilder.withBody(baos.toByteArray());
+        e = EventBuilder.withBody(baos.toByteArray(), headers);
       } finally {
         // no-op
       }
 
       return e;
     }
-    
+
     @Override
     public void messageReceived(ChannelHandlerContext ctx, MessageEvent mEvent) {
       try {
@@ -111,12 +116,10 @@ public class NetcatUdpSource extends AbstractSource
         counterGroup.incrementAndGet("events.success");
       } catch (ChannelException ex) {
         counterGroup.incrementAndGet("events.dropped");
-        logger.error("Error writting to channel", ex);
-        return;
+        logger.error("Error writing to channel", ex);
       } catch (RuntimeException ex) {
         counterGroup.incrementAndGet("events.dropped");
         logger.error("Error retrieving event from udp stream, event dropped", ex);
-        return;
       }
     }
   }
@@ -124,18 +127,18 @@ public class NetcatUdpSource extends AbstractSource
   @Override
   public void start() {
     // setup Netty server
-    ConnectionlessBootstrap serverBootstrap = new ConnectionlessBootstrap
-        (new OioDatagramChannelFactory(Executors.newCachedThreadPool()));
-    final NetcatHander handler = new NetcatHander();
+    ConnectionlessBootstrap serverBootstrap = new ConnectionlessBootstrap(
+        new OioDatagramChannelFactory(Executors.newCachedThreadPool()));
+    final NetcatHandler handler = new NetcatHandler();
     serverBootstrap.setOption("receiveBufferSizePredictorFactory",
-      new AdaptiveReceiveBufferSizePredictorFactory(DEFAULT_MIN_SIZE,
+        new AdaptiveReceiveBufferSizePredictorFactory(DEFAULT_MIN_SIZE,
         DEFAULT_INITIAL_SIZE, maxsize));
     serverBootstrap.setPipelineFactory(new ChannelPipelineFactory() {
       @Override
       public ChannelPipeline getPipeline() {
-       return Channels.pipeline(handler);
+        return Channels.pipeline(handler);
       }
-     });
+    });
 
     if (host == null) {
       nettyChannel = serverBootstrap.bind(new InetSocketAddress(port));

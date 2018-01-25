@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.cloudera.flume.source;
+package org.apache.flume.source;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -24,10 +24,7 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.InetAddress;
 import java.net.DatagramSocket;
-
-import com.cloudera.flume.source.NetcatUdpSource;
 import com.google.common.base.Charsets;
-import com.google.common.base.Strings;
 import org.apache.flume.Channel;
 import org.apache.flume.ChannelSelector;
 import org.apache.flume.Context;
@@ -37,24 +34,19 @@ import org.apache.flume.channel.ChannelProcessor;
 import org.apache.flume.channel.MemoryChannel;
 import org.apache.flume.channel.ReplicatingChannelSelector;
 import org.apache.flume.conf.Configurables;
-import org.joda.time.DateTime;
 import org.junit.Assert;
 import org.junit.Test;
 import org.slf4j.LoggerFactory;
 
-
 public class TestNetcatUdpSource {
-  private static final org.slf4j.Logger logger =
-    LoggerFactory.getLogger(TestNetcatUdpSource.class);
+  private static final org.slf4j.Logger logger = LoggerFactory.getLogger(TestNetcatUdpSource.class);
   private NetcatUdpSource source;
   private Channel channel;
   private static final int TEST_NETCAT_PORT = 0;
-  private final DateTime time = new DateTime();
-  private final String stamp1 = time.toString();
-  private final String host1 = "localhost.localdomain";
   private final String shortString = "Lorem ipsum dolor sit amet.";
-  private final String mediumString = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nunc maximus rhoncus viverra. Nunc a metus.";
-  
+  private final String mediumString = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. " +
+                                      "Nunc maximus rhoncus viverra. Nunc a metus.";
+
   private void init() {
     source = new NetcatUdpSource();
     channel = new MemoryChannel();
@@ -70,7 +62,7 @@ public class TestNetcatUdpSource {
     source.setChannelProcessor(new ChannelProcessor(rcs));
     Context context = new Context();
     context.put("port", String.valueOf(TEST_NETCAT_PORT));
-    
+
     source.configure(context);
 
   }
@@ -81,16 +73,16 @@ public class TestNetcatUdpSource {
   private void runUdpTest(String data1) throws IOException {
     init();
     source.start();
-    // Write some message to the syslog port
-    DatagramSocket syslogSocket;
+    // Write some message to the port
+    DatagramSocket socket;
     DatagramPacket datagramPacket;
     datagramPacket = new DatagramPacket(data1.getBytes(),
       data1.getBytes().length,
       InetAddress.getLocalHost(), source.getSourcePort());
     for (int i = 0; i < 10 ; i++) {
-      syslogSocket = new DatagramSocket();
-      syslogSocket.send(datagramPacket);
-      syslogSocket.close();
+      socket = new DatagramSocket();
+      socket.send(datagramPacket);
+      socket.close();
     }
 
     List<Event> channelEvents = new ArrayList<Event>();
@@ -117,7 +109,7 @@ public class TestNetcatUdpSource {
       logger.info(str);
       Assert.assertArrayEquals(data1.getBytes(),
             e.getBody());
-      
+
     }
   }
 
@@ -125,19 +117,19 @@ public class TestNetcatUdpSource {
   public void testLargePayload() throws Exception {
     init();
     source.start();
-    // Write some message to the syslog port
+    // Write some message to the netcat port
 
     byte[] largePayload = getPayload(1000).getBytes();
 
-    DatagramSocket syslogSocket;
+    DatagramSocket socket;
     DatagramPacket datagramPacket;
     datagramPacket = new DatagramPacket(largePayload,
             1000,
             InetAddress.getLocalHost(), source.getSourcePort());
     for (int i = 0; i < 10 ; i++) {
-      syslogSocket = new DatagramSocket();
-      syslogSocket.send(datagramPacket);
-      syslogSocket.close();
+      socket = new DatagramSocket();
+      socket.send(datagramPacket);
+      socket.close();
     }
 
     List<Event> channelEvents = new ArrayList<Event>();
